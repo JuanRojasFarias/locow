@@ -1,0 +1,48 @@
+import time
+
+# Función para imprimir el tablero con las reinas posicionadas
+def print_board(board, n):
+    for row in range(n):
+        line = ['.'] * n
+        line[board[row]] = 'Q'
+        print(' '.join(line))
+    print("\n")
+
+# Función para verificar si es seguro colocar una reina en la columna "col" de la fila "row"
+def is_safe(board, row, col):
+    for i in range(row):
+        # Verificar si hay otra reina en la misma columna o en las diagonales
+        if board[i] == col or \
+           board[i] - i == col - row or \
+           board[i] + i == col + row:
+            return False
+    return True
+
+# Función que resuelve el problema de N-Reinas usando Ramificación y Poda
+def solve_nqueens(n):
+    board = [-1] * n  # Inicializar el tablero
+    solutions = []    # Almacenar las soluciones
+    start_time = time.time()  # Iniciar temporizador
+
+    def backtrack(row):
+        if row == n:
+            # Si hemos llegado a una solución, la almacenamos y la imprimimos
+            solutions.append(board[:])
+            print_board(board, n)
+        else:
+            for col in range(n):
+                if is_safe(board, row, col):
+                    board[row] = col  # Colocar la reina
+                    backtrack(row + 1)  # Intentar colocar la siguiente reina
+                    board[row] = -1  # Backtrack, eliminar la reina y probar otra posición
+
+    # Llamar a la función recursiva
+    backtrack(0)
+
+    elapsed_time = time.time() - start_time
+    print(f"Tiempo total de ejecución: {elapsed_time:.2f} segundos")
+    print(f"Se encontraron {len(solutions)} soluciones.")
+
+# Cambia el valor de n para modificar el número de reinas
+n_queens = 8
+solve_nqueens(n_queens)
