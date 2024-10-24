@@ -1,0 +1,110 @@
+import numpy as np
+from numba import njit
+from joblib import Parallel, delayed
+import time
+
+@njit
+def evaluar_fitness(solucion):
+    """Calcula el número de ataques entre las reinas en una solución."""
+    n = len(solucion)
+    ataques = 0
+    for i in range(n):
+        for j in range(i + 1, n):
+            if abs(solucion[i] - solucion[j]) == abs(i - j):
+                ataques += 1
+    return ataques
+
+@njit
+def mutar_colonia(colonia, n):
+    """Mutación de una colonia intercambiando dos reinas o generando una nueva permutación."""
+    if np.random.rand() < 0.05:
+        return np.random.permutation(n).astype(np.int64)
+    else:
+        i, j = np.random.randint(0, n, size=2)
+        colonia[i], colonia[j] = colonia[j], colonia[i]
+    return colonia.astype(np.int64)
+
+@njit
+def crear_imperios(n_imperios, n_colonias, n):
+    """Crea imperios (soluciones iniciales) y colonias adicionales."""
+    imperios = []
+    for _ in range(n_imperios):
+        colonia = np.random.permutation(n).astype(np.int64)
+        imperios.append(colonia)
+    colonias = []
+    for _ in range(n_colonias):
+        colonia = np.random.permutation(n).astype(np.int64)
+        colonias.append(colonia)
+    return imperios, colonias
+
+@njit
+def correr_ica(n_imperios, n_colonias, n, max_iter):
+    """Corre el algoritmo ICA por un número de iteraciones, buscando la mejor solución."""
+    imperios, colonias = crear_imperios(n_imperios, n_colonias, n)
+    mejor_solucion = None
+    mejor_fitness = np.inf
+    
+    for _ in range(max_iter):
+        # Evaluar fitness de cada colonia
+        for colonia in colonias:
+            fitness = evaluar_fitness(colonia)
+            if fitness < mejor_fitness:
+                mejor_fitness = fitness
+                mejor_solucion = colonia
+        
+        # Mutar las colonias para la siguiente iteración
+        colonias = [mutar_colonia(np.copy(colonia), n) for colonia in colonias]
+        
+        # Si encontramos una solución perfecta (fitness = 0), paramos
+        if mejor_fitness == 0:
+            break
+    
+    return mejor_solucion, mejor_fitness
+
+def ejecutar_experimento(n_imperios, n_colonias, n, max_iter):
+    """Ejecuta un experimento del ICA, mide el tiempo y devuelve fitness y tiempo."""
+    inicio = time.time()
+    mejor_solucion, mejor_fitness = correr_ica(n_imperios, n_colonias, n, max_iter)
+    fin = time.time()
+    tiempo = fin - inicio
+    return mejor_fitness, tiempo
+
+# Parámetros del experimento
+n_experimentos = 31  # Número de experimentos
+n_imperios = 5       # Número de imperios
+n_colonias = 20      # Número de colonias por imperio
+n = 512              # Número de reinas
+max_iter = 5000      # Máximo número de iteraciones
+
+# Ejecutar los experimentos en paralelo
+resultados = Parallel(n_jobs=-1)(delayed(ejecutar_experimento)(n_imperios, n_colonias, n, max_iter) for _ in range(n_experimentos))
+
+# Procesar los resultados: obtener fitness y tiempos por experimento
+fitness_por_experimento = [resultado[0] for resultado in resultados]
+tiempo_por_experimento = [resultado[1] for resultado in resultados]
+
+# Calcular estadísticas de fitness
+fitness_maximo = np.max(fitness_por_experimento)
+fitness_minimo = np.min(fitness_por_experimento)
+fitness_promedio = np.mean(fitness_por_experimento)
+desviacion_estandar_fitness = np.std(fitness_por_experimento)
+
+# Calcular estadísticas de tiempo
+tiempo_maximo = np.max(tiempo_por_experimento)
+tiempo_minimo = np.min(tiempo_por_experimento)
+tiempo_promedio = np.mean(tiempo_por_experimento)
+
+# Imprimir resultados individuales
+for i, (fitness, tiempo) in enumerate(zip(fitness_por_experimento, tiempo_por_experimento)):
+    print(f"Experimento {i+1}: Fitness = {fitness}, Tiempo = {tiempo:.4f} segundos")
+
+# Imprimir resultados generales
+print("\nEstadísticas generales:")
+print(f"Fitness máximo: {fitness_maximo}")
+print(f"Fitness mínimo: {fitness_minimo}")
+print(f"Fitness promedio: {fitness_promedio}")
+print(f"Desviación estándar del fitness: {desviacion_estandar_fitness}")
+
+print(f"\nTiempo máximo: {tiempo_maximo:.4f} segundos")
+print(f"Tiempo mínimo: {tiempo_minimo:.4f} segundos")
+print(f"Tiempo promedio: {tiempo_promedio:.4f} segundos")
